@@ -1,0 +1,83 @@
+local function GetAura()
+
+	local Chance = math.random(0, Max)*RollLuckBoost
+	local AuraGottenTable
+
+	for _, SelectedAuraTable: AurasProperties.AuraTable in AurasProperties do
+
+		local AuraChance = SelectedAuraTable.Properties.Chance
+		if not AuraChance then warn(SelectedAuraTable) continue end
+		
+		if Chance <= Max * AuraChance then
+
+			local success, res = pcall(function()
+				return AuraGottenTable.Properties.Chance
+			end)
+			if not success then
+				AuraGottenTable = SelectedAuraTable
+				continue 
+			end
+
+			--[[
+			print(SelectedAuraTable.Properties.Name .. ": " .. Chance)
+			print(SelectedAuraTable.Properties.Name .. ": " ..  Max * AuraChance)
+			]]
+			
+			if AuraGottenTable.Properties.Chance then
+				if AuraChance > AuraGottenTable.Properties.Chance then continue end
+			end
+
+			-- || Checks Ended, Continue
+
+			AuraGottenTable = SelectedAuraTable
+
+		end	
+	end
+
+	if not AuraGottenTable then
+		AuraGottenTable = AurasProperties.Common
+		warn("Aura is nil")
+	end
+
+	return AuraGottenTable
+
+end
+
+--// UI that are shown when rolling an aura
+local ShownUIDuringRoll = {
+	Darkner, EquipButton, SkipButton, RollButtonCooldownFrame
+}
+
+local function ShowDarkner()
+
+	-- || Showing and Hiding Certain UI With Loop
+
+	for _, v: TextLabel in CoreUI:GetDescendants() do
+
+		if RollType == "Fast" then
+			if v == RollButton then continue end
+		end
+		if AutoRollOn then
+			if v == RollButton then continue end
+			if v == AutoRollButton then continue end
+			if v == FastRollButton then continue end
+		end
+		if not table.find(UIHaveVisibleProperty, v.ClassName) then
+			continue
+		end
+
+		if table.find(ShownUIDuringRoll, v) then
+			v.Visible = true
+		else
+			v.Visible = false
+		end
+
+	end
+
+	local DarknerTween = TweenService:Create(Darkner, ButtonHoverInfo, {BackgroundTransparency = 0.6})
+
+	DarknerTween:Play()
+	task.wait(ButtonHoverInfo.Time / 2)
+	AuraTextLabels.TextBG.Visible = true
+
+end
