@@ -81,3 +81,183 @@ local function ShowDarkner()
 	AuraTextLabels.TextBG.Visible = true
 
 end
+local AddToInventoryBind = Bindable:WaitForChild("AddToInventory")
+
+EquipButton.Activated:Connect(function()
+
+	local Aura = EquipSkipChangeUI()
+	if not Aura then warn("Aura is nil") return end
+
+	AddToInventoryBind:Invoke(Aura)
+	CreateAuraEvent:FireServer(Aura)
+
+end)
+
+SkipButton.Activated:Connect(function()
+	if not EquipSkipChangeUI() then return end
+end)
+
+local function Roll()
+
+	---// Early
+
+	if RollButtonCooldownFrame.Visible then return end
+
+	---// Continuing With Other Functions
+
+	repeat 
+		RollEvent:FireServer()
+		RollUIEffects(GetAura())
+	until not AutoRollOn
+
+end
+
+local function FastRoll()
+	if RollType == "Normal" then
+		FastRollButton.Text = "Fast Roll: On"
+		RollType = "Fast"
+	else		
+		FastRollButton.Text = "Fast Roll: Off"
+		RollType = "Normal"
+	end
+end
+local function AutoRoll()
+	if AutoRollOn then
+		AutoRollOn = false
+		AutoRollButton.Text = "Auto Roll: Off"
+	else		
+		AutoRollOn = true
+		AutoRollButton.Text = "Auto Roll: On"
+	end
+end
+
+local InformationMainFrame = InfoFrame:WaitForChild("InformationMainFrame")
+
+local function Inventory()
+	if InvFrame.Visible then		
+		InvFrame.Visible = false		
+	else
+
+		InformationMainFrame.AuraLabel.Text = "Empty"
+		InformationMainFrame.AuraLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		InformationMainFrame.AuraLabel.UIStroke.Color = Color3.fromRGB()
+
+		InformationMainFrame.RarityAuraLabel.Text = "1 in ???"
+		InformationMainFrame.RarityAuraLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		InformationMainFrame.RarityAuraLabel.UIStroke.Color = Color3.fromRGB()
+
+		InvEquipButton.Text = "Equip"
+		InvEquipButton.BackgroundColor3 = Color3.fromRGB(227, 227, 227)
+
+		InvFrame.Visible = true
+
+	end
+end
+local function GetPartsTouching(Part: Part, Exlusions: "Parent" | BoolValue, Type: string)
+	
+	local filter = OverlapParams.new()
+	
+	if Type == "ZomTouching" then
+		filter.FilterType = Enum.RaycastFilterType.Include
+		for _, v in workspace.CreatedZombies:GetChildren() do
+			local zomSens: Part = v:FindFirstChild("Sensor")
+			if not zomSens then continue end
+			filter:AddToFilter(zomSens)
+		end
+	elseif Type == "Tower" then
+		filter.FilterType = Enum.RaycastFilterType.Include
+		for _, v in workspace.Creations.CreatedTowers:GetChildren() do
+			local RangeSens: Part
+			
+			if v.Name == "TODO?_#FF133" then
+				RangeSens = v
+			else
+				RangeSens = v:FindFirstChild("RangeSensor")
+			end
+			
+			if not RangeSens then continue end
+			filter:AddToFilter(RangeSens)
+			
+		end	
+	else
+		filter.FilterType = Enum.RaycastFilterType.Exclude
+		if Exlusions then
+			filter:AddToFilter(Exlusions)
+		end
+	end
+	
+	local cframe, size = Part.CFrame, Part.Size
+	return workspace:GetPartBoundsInBox(cframe, size, filter)
+	
+end
+
+local CanHoverClasses = {
+	"TextButton", "ImageButton"
+}
+
+----// When Button Clicked
+
+local function ButtonClicked(Button)
+	--// Rolling
+	if Button == RollButton then
+		Roll()
+	elseif Button == FastRollButton then
+		FastRoll()
+	elseif Button == AutoRollButton then
+		AutoRoll()
+		--// SideButtons
+	elseif Button == InvButton then
+		Inventory()
+		--// Other	
+	elseif Button == MuteMusicButton then
+		MuteMusic()
+	end
+end
+
+----// Button Tweens
+
+local orgSideButtonsNameLabelPos = SideButtonsNameLabel.Position
+local SBNLInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+for _, Button: TextButton in CoreUI:GetDescendants() do
+
+	if not table.find(CanHoverClasses, Button.ClassName) then continue end
+
+	local orgButtonSize = Button.Size
+	local TargetHoverSize = UDim2.new(orgButtonSize.X.Scale * SizeHoverIntensity, 0, orgButtonSize.Y.Scale * SizeHoverIntensity)
+	local TargetClickSize = UDim2.new(orgButtonSize.X.Scale / SizeClickIntensity, 0, orgButtonSize.Y.Scale / SizeClickIntensity)
+
+	-- || Button Interacted Functions
+
+	Button.MouseEnter:Connect(function()
+
+		SFXFolder.Hover:Play()
+		TweenService:Create(Button, ButtonHoverInfo, {Size = TargetHoverSize}):Play()
+
+		if Button.Parent.Parent == SidesButtons then
+
+			SideButtonsNameLabel.Text = Button.Parent.Name
+			SideButtonsNameLabel.Visible = true
+			SideButtonsNameLabel.Position = orgSideButtonsNameLabelPos
+
+			local SBNLTargetPos = UDim2.new(Button.Position.X.Scale + .08, 0, Button.Position.Y.Scale + .03)
+			TweenService:Create(SideButtonsNameLabel, SBNLInfo, {Position = SBNLTargetPos}):Play()
+
+		end
+
+	end)
+	Button.MouseLeave:Connect(function()
+		SideButtonsNameLabel.Visible = false
+		TweenService:Create(Button, ButtonHoverInfo, {Size = orgButtonSize}):Play()
+	end)
+	Button.Activated:Connect(function()
+
+		Button.Size = TargetClickSize
+		TweenService:Create(Button, ButtonHoverInfo, {Size = TargetHoverSize}):Play()
+		SFXFolder.Click:Play()
+
+		ButtonClicked(Button)
+
+	end)
+
+end
