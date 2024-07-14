@@ -261,3 +261,68 @@ for _, Button: TextButton in CoreUI:GetDescendants() do
 	end)
 
 end
+function MoveNPC(Point, Character)
+	local HRP = Character.HumanoidRootPart
+	repeat
+		task.wait(.0001)
+		local sucess, res = pcall(function()
+			return Character.Humanoid
+		end)
+		if sucess and res then
+			Character.Humanoid:MoveTo(Point)		
+		end
+	until (HRP.Position - Vector3.new(Point.X, HRP.Position.Y, Point.Z) ).magnitude <= 1
+end
+
+--// Zombie Properties
+
+local ZomID = 0
+local ZombieSpeedMul = 1
+
+local function CreateZombie(Zombie: Model | Instance, Wave: string, Amount: number, WaitTime: number, ZombieStats)
+
+	for i=1, Amount do
+
+		if not Zombie then error(Zombie) return end
+		local newZombie: Model = Zombie:Clone()
+
+		ZomID += 1
+		newZombie.Name = newZombie.Name .. ZomID
+
+		newZombie.Parent = workspace.CreatedZombies
+		newZombie:PivotTo(CFrame.new(StartBlock.Position.X, StartBlock.Position.Y + 3, StartBlock.Position.Z))
+
+		local RootPart: Part = newZombie:FindFirstChild("HumanoidRootPart")
+		newZombie.PrimaryPart = RootPart
+
+		local Humanoid: Humanoid = newZombie:FindFirstChild("Humanoid")
+		Humanoid.WalkSpeed = ZombieStats.Speed * ZombieSpeedMul
+		Humanoid.MaxHealth = ZombieStats.Health
+		Humanoid.Health = Humanoid.MaxHealth
+
+		-- || On Death
+
+		Humanoid.Died:Connect(function()
+			newZombie:Destroy()
+		end)
+
+		-- || Moving the Zombie
+
+		task.spawn(function()
+			for i=1, #TargetPositions:GetChildren() do
+
+				local TargetObj: Part = TargetPositions[i]
+				if not TargetObj then warn(TargetObj) continue end
+
+				MoveNPC(TargetObj.Position, newZombie)
+
+			end
+			MoveNPC(workspace.End.Position, newZombie)
+			newZombie:Destroy()
+		end)
+
+		task.wait(WaitTime)
+
+	end
+
+end
