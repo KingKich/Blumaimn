@@ -1,187 +1,270 @@
-local function GetAura()
+The Script Below is a Gun System
 
-	local Chance = math.random(0, Max)*RollLuckBoost
-	local AuraGottenTable
+-----------------------------------------------------------<<< Variables
+---// Services
 
-	for _, SelectedAuraTable: AurasProperties.AuraTable in AurasProperties do
+local TweenService = game:GetService("TweenService")
+local UserInput = game:GetService("UserInputService")
 
-		local AuraChance = SelectedAuraTable.Properties.Chance
-		if not AuraChance then warn(SelectedAuraTable) continue end
-		
-		if Chance <= Max * AuraChance then
+---// Player Variables
 
-			local success, res = pcall(function()
-				return AuraGottenTable.Properties.Chance
-			end)
-			if not success then
-				AuraGottenTable = SelectedAuraTable
-				continue 
-			end
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Backpack = Player.Backpack
+local HumanoidRootPart: Part = Character:WaitForChild("HumanoidRootPart")
 
-			--[[
-			print(SelectedAuraTable.Properties.Name .. ": " .. Chance)
-			print(SelectedAuraTable.Properties.Name .. ": " ..  Max * AuraChance)
-			]]
-			
-			if AuraGottenTable.Properties.Chance then
-				if AuraChance > AuraGottenTable.Properties.Chance then continue end
-			end
+while not Backpack do
+	task.wait()
+end
 
-			-- || Checks Ended, Continue
+local Camera = workspace.CurrentCamera
+local Mouse = Player:GetMouse()
+local Storage = game.ReplicatedStorage
 
-			AuraGottenTable = SelectedAuraTable
+local GunFolder = Storage:WaitForChild("Gun")
+local ModulesFolder = Storage:WaitForChild("Modules")
+local EffectsFolder = GunFolder:WaitForChild("Effects")
 
-		end	
+---// Properties
+local Upgrade = 1
+
+-----------------------------------------------------------<<< Early Code
+
+Mouse.Icon = "rbxassetid://18495779444"
+
+-----------------------------------------------------------<<< Functions
+
+Here, we are raycasting to see what Position the bullet is going to land on.
+
+local GunParams = RaycastParams.new()
+GunParams.FilterType = Enum.RaycastFilterType.Exclude
+GunParams.FilterDescendantsInstances = {Character}
+
+local function MouseRaycast(Params, Origin, Position2: Vector3)
+	
+	local MousePos = UserInput:GetMouseLocation() -- Gets Mouse Position
+	local MouseRay = Camera:ViewportPointToRay(MousePos.X, MousePos.Y)
+	local result = workspace:Raycast(MouseRay.Origin, MouseRay.Direction * 100, Params)  -- Casts a Ray to the Mouse Position
+
+	if result then
+		return result
 	end
-
-	if not AuraGottenTable then
-		AuraGottenTable = AurasProperties.Common
-		warn("Aura is nil")
-	end
-
-	return AuraGottenTable
 
 end
 
---// UI that are shown when rolling an aura
-local ShownUIDuringRoll = {
-	Darkner, EquipButton, SkipButton, RollButtonCooldownFrame
-}
+-----------------------------------------------------------<<< Gun Functionality
 
-local function ShowDarkner()
+local Gun = Backpack:WaitForChild("Gun")
+local BulletsFolder = GunFolder:WaitForChild("Bullets")
+local GunUpgrades = require(ModulesFolder:WaitForChild("GunUpgrades")) 
 
-	-- || Showing and Hiding Certain UI With Loop
+Gun.Parent = Character
 
-	for _, v: TextLabel in CoreUI:GetDescendants() do
+-- This Function Runs Through a List of particles, Emits them to Create a Gun Firing Effect.
 
-		if RollType == "Fast" then
-			if v == RollButton then continue end
-		end
-		if AutoRollOn then
-			if v == RollButton then continue end
-			if v == AutoRollButton then continue end
-			if v == FastRollButton then continue end
-		end
-		if not table.find(UIHaveVisibleProperty, v.ClassName) then
-			continue
-		end
-
-		if table.find(ShownUIDuringRoll, v) then
-			v.Visible = true
-		else
-			v.Visible = false
-		end
-
+local function CreateBulletEffects(Bullet: Part | UnionOperation)
+	local BulletPos = Bullet.Position
+	local newBlast = EffectsFolder.Blast:Clone()
+	
+	for _, v: ParticleEmitter in newBlast:GetChildren() do
+		v.Parent = Bullet
+		v:Emit()
 	end
+	task.wait(.5)
+	newBlast:Destroy()
+end
 
-	local DarknerTween = TweenService:Create(Darkner, ButtonHoverInfo, {BackgroundTransparency = 0.6})
+local function FireBullet()
 
-	DarknerTween:Play()
-	task.wait(ButtonHoverInfo.Time / 2)
-	AuraTextLabels.TextBG.Visible = true
+	local TargetPos	
+	TargetPos = Mouse.Hit -- Gets Mouse CFrame
+
+	-- || Moving Bullet to Target
+
+	local TargetGunTable: GunUpgrades.Upgrade = GunUpgrades["Upgrade" .. Upgrade]
+	local BulletToDestinationTime = (TargetPos.Position - HumanoidRootPart.Position).Magnitude/TargetGunTable.Bullet.Properties.Speed -- Calculates Speed with a Module which is Divided with the Magnitude of the TargetPostion, and the OriginPostiion (HumanoidRootPart.Position)
+
+	local NewBullet = TargetGunTable.Bullet.Obj:Clone()
+	NewBullet.Parent = workspace
+	NewBullet.Position = Gun.Handle.Position
+
+	local ShootTI = TweenInfo.new(BulletToDestinationTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	NewBullet.Orientation = Mouse.Hit.LookVector
+	local MoveBulletTween
+
+	-- The Tween for the Bullet Moving to the Targeted Position
+	MoveBulletTween = TweenService:Create(NewBullet, ShootTI, {CFrame = TargetPos}) -- || No Collision In Way
+
+	MoveBulletTween:Play()
+	
+	-- || Effects
+	
+	local ExplodeAtGun = EffectsFolder.ExplodeAtGun:Clone()
+	ExplodeAtGun.Parent = Gun.Tip
+	ExplodeAtGun:Emit(16)
+	
+	task.spawn(function()
+		MoveBulletTween.Completed:Wait()
+		CreateBulletEffects(NewBullet)
+	end)
+	
+	task.wait(5)
+	NewBullet:Destroy()
 
 end
-local AddToInventoryBind = Bindable:WaitForChild("AddToInventory")
 
----// Skip/Equip Connections
-
-EquipButton.Activated:Connect(function()
-
-	local Aura = EquipSkipChangeUI()
-	if not Aura then warn("Aura is nil") return end
-
-	AddToInventoryBind:Invoke(Aura)
-	CreateAuraEvent:FireServer(Aura)
-
+Gun.Activated:Connect(function()
+	FireBullet()
 end)
 
-SkipButton.Activated:Connect(function()
-	if not EquipSkipChangeUI() then return end
+Script 2:
+
+
+---// This Other Script is For Visuals (Stil in the Gun Game), such as Arm Drag, Arms, Gun Drag, Etc.
+-----------------------------------------------------------<<< Variables
+
+---// Player Variables
+
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Backpack = Player.Backpack
+local HumanoidRootPart: Part = Character:WaitForChild("HumanoidRootPart")
+
+while not Backpack do
+	task.wait()
+end
+
+local Camera = workspace.CurrentCamera
+local Mouse = Player:GetMouse()
+local Storage = game.ReplicatedStorage
+
+local GunFolder = Storage:WaitForChild("Gun")
+local ModulesFolder = Storage:WaitForChild("Modules")
+local EffectsFolder = GunFolder:WaitForChild("Effects")
+
+Camera.FieldOfView = 75
+game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+
+local Cloneable = Storage:WaitForChild("Cloneable")
+local StorageArmsFolder = Cloneable:WaitForChild("Arms")
+local Gun = Character:WaitForChild("Gun")
+local GunHandle: Part = Gun:WaitForChild("Handle")
+
+-----------------------------------------------------------<<< Arms
+
+local Arms = StorageArmsFolder:Clone()
+
+---// Positioning the Arms
+
+Arms.Parent = workspace
+Arms:MoveTo(HumanoidRootPart.Position + Vector3.new(0, -.1, 0))
+
+--// Welding the Arms to the Character
+
+for _, v in Arms:GetChildren() do
+	if not v:FindFirstChildWhichIsA("WeldConstraint") then
+		continue
+	end
+	v:FindFirstChildWhichIsA("WeldConstraint").Part0 = v
+	v:FindFirstChildWhichIsA("WeldConstraint").Part1 = HumanoidRootPart
+end
+
+----------------------------------------------------------->>>
+
+
+I ran out of code of the gun system, as this was something I made just today.
+The Next script is part of a TDS game that I made.
+
+
+-----------------------------------------------------------------------<<< VARIABLES
+--// Services
+
+local PhysicsService = game:GetService("PhysicsService")
+local TweenService = game:GetService("TweenService")
+
+--// Instances
+
+local CoreStorage = game.ReplicatedStorage.CoreStorage
+local FunctionalityFolder = CoreStorage.Functionality
+local CloneableFolder = FunctionalityFolder.Cloneable
+
+local ZombiesFolder = FunctionalityFolder.Zombies
+local Charger = ZombiesFolder.Charger
+local Infected = ZombiesFolder.Infected
+
+local WavesModule = require(script.Waves)
+local StartBlock: Part = workspace.Start
+local TestingMap = workspace["Testing Map"]
+
+local Path = TestingMap.Path
+local TargetPositions = Path.TargetPositions
+local SoundsFolder = FunctionalityFolder.Sounds
+
+local EventsFolder = FunctionalityFolder.Events
+local OnWaveStartEvent = EventsFolder.OnWaveStart
+local SkipWaveVoteEvent = EventsFolder.SkipWaveVote
+
+local TowersFolder = FunctionalityFolder.Towers
+local TowerInstances = TowersFolder.Instances
+local Fighter = TowerInstances.Fighter
+
+--// Set Variables
+
+local CurrentWave = 1
+local AmountSkipped = 0
+
+-----------------------------------------------------------------------<<< LEADERSTATS
+
+game.Players.PlayerAdded:Connect(function(Player)
+	
+	local leaderstats = Instance.new("Folder", Player)
+	leaderstats.Name = "leaderstats"
+	
+	local Cash = Instance.new("IntValue", leaderstats)
+	Cash.Name = "Cash"
+	Cash.Value = 100000
+	
 end)
 
-local function Roll()
+-----------------------------------------------------------------------<<< EARLY CODE
 
-	---// Early
+---// TIMER
 
-	if RollButtonCooldownFrame.Visible then return end
+local ChangeTimerEvent = EventsFolder.ChangeTimer
+local SkipButtonIsVisible
 
-	---// Continuing With Other Functions
-
-	repeat 
-		RollEvent:FireServer()
-		RollUIEffects(GetAura())
-	until not AutoRollOn
-
-end
-
-local function FastRoll()
-	if RollType == "Normal" then
-		FastRollButton.Text = "Fast Roll: On"
-		RollType = "Fast"
-	else		
-		FastRollButton.Text = "Fast Roll: Off"
-		RollType = "Normal"
-	end
-end
-local function AutoRoll()
-	if AutoRollOn then
-		AutoRollOn = false
-		AutoRollButton.Text = "Auto Roll: Off"
-	else		
-		AutoRollOn = true
-		AutoRollButton.Text = "Auto Roll: On"
+local function ChangePlayerTimer(Type: string)
+	if Type == "PreWave_Countdown" then -- Checks if the RemoteEvent is Requesting a Countdown Before Wave
+		for i=5, 0, -1 do
+			ChangeTimerEvent:FireAllClients(i, true) -- Fires a RemoteEvent to all Clients
+			task.wait(1)
+		end
 	end
 end
 
-local InformationMainFrame = InfoFrame:WaitForChild("InformationMainFrame")
+local PlayerJoinEvent = EventsFolder.PlayerJoinEvent
 
-local function Inventory()
-	if InvFrame.Visible then		
-		InvFrame.Visible = false		
-	else
+game.Players.PlayerAdded:Connect(function(Player)
+	PlayerJoinEvent:FireClient(Player, SkipButtonIsVisible, "Wave " .. CurrentWave, workspace.Creations.CreatedTowers:GetChildren())	
+end)
 
-		InformationMainFrame.AuraLabel.Text = "Empty"
-		InformationMainFrame.AuraLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-		InformationMainFrame.AuraLabel.UIStroke.Color = Color3.fromRGB()
+---// Useful Functions
 
-		InformationMainFrame.RarityAuraLabel.Text = "1 in ???"
-		InformationMainFrame.RarityAuraLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-		InformationMainFrame.RarityAuraLabel.UIStroke.Color = Color3.fromRGB()
-
-		InvEquipButton.Text = "Equip"
-		InvEquipButton.BackgroundColor3 = Color3.fromRGB(227, 227, 227)
-
-		InvFrame.Visible = true
-
-	end
-end
+--- This Function Checks If a Zombie is in the Range of a Tower
 local function GetPartsTouching(Part: Part, Exlusions: "Parent" | BoolValue, Type: string)
-
-	---// Checks If Sensors of Zombie/Towers Are Touching
-	local filter = OverlapParams.new()
+	
+	local filter = OverlapParams.new() -- Creates a Filter
 	
 	if Type == "ZomTouching" then
 		filter.FilterType = Enum.RaycastFilterType.Include
+		-- A loop adding all other zombies into the filter.
+
 		for _, v in workspace.CreatedZombies:GetChildren() do
 			local zomSens: Part = v:FindFirstChild("Sensor")
 			if not zomSens then continue end
 			filter:AddToFilter(zomSens)
 		end
-	elseif Type == "Tower" then
-		filter.FilterType = Enum.RaycastFilterType.Include
-		for _, v in workspace.Creations.CreatedTowers:GetChildren() do
-			local RangeSens: Part
-			
-			if v.Name == "TODO?_#FF133" then
-				RangeSens = v
-			else
-				RangeSens = v:FindFirstChild("RangeSensor")
-			end
-			
-			if not RangeSens then continue end
-			filter:AddToFilter(RangeSens)
-			
-		end	
+
 	else
 		filter.FilterType = Enum.RaycastFilterType.Exclude
 		if Exlusions then
@@ -190,142 +273,37 @@ local function GetPartsTouching(Part: Part, Exlusions: "Parent" | BoolValue, Typ
 	end
 	
 	local cframe, size = Part.CFrame, Part.Size
-	return workspace:GetPartBoundsInBox(cframe, size, filter)
+	return workspace:GetPartBoundsInBox(cframe, size, filter) -- returns the result of what is inside the zombies.
 	
 end
 
-local CanHoverClasses = {
-	"TextButton", "ImageButton"
-}
 
-----// When Button Clicked
+----// This Next Script is for when a Client Places a Tower
 
-local function ButtonClicked(Button)
-	--// Rolling
-	if Button == RollButton then
-		Roll()
-	elseif Button == FastRollButton then
-		FastRoll()
-	elseif Button == AutoRollButton then
-		AutoRoll()
-		--// SideButtons
-	elseif Button == InvButton then
-		Inventory()
-		--// Other	
-	elseif Button == MuteMusicButton then
-		MuteMusic()
-	end
-end
+local TowerID = 0
 
-----// Button Tweens
+PlaceTowerEvent.OnServerEvent:Connect(function(Player, Tower: Model, TowerTable, TowerPos: CFrame)
+	
+	Player.leaderstats.Cash.Value -= TowerTable.Costs.BaseCost -- Checks if the Player has Enough Money
+	Tower:SetAttribute("Level", 0) -- Sets the Level of the Tower (Base Level 0 as it is a new tower)
+	Tower:SetAttribute("Player", Player.Name) -- Sets the value of who places the tower
+	Tower:SetAttribute("Attacking", false)
+	TowerID += 1 -- Increases ID to make this tower different from the rest.
 
-local orgSideButtonsNameLabelPos = SideButtonsNameLabel.Position
-local SBNLInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	--// Cloning the Tower in Replicated Storage
+	local TowerHumanoid: Humanoid = Tower:WaitForChild("Humanoid")	
+	local TargetTower = Tower:Clone()
+	local RootPart: Part = TargetTower:WaitForChild("HumanoidRootPart")
 
-for _, Button: TextButton in CoreUI:GetDescendants() do
-
-	if not table.find(CanHoverClasses, Button.ClassName) then continue end
-
-	local orgButtonSize = Button.Size
-	local TargetHoverSize = UDim2.new(orgButtonSize.X.Scale * SizeHoverIntensity, 0, orgButtonSize.Y.Scale * SizeHoverIntensity)
-	local TargetClickSize = UDim2.new(orgButtonSize.X.Scale / SizeClickIntensity, 0, orgButtonSize.Y.Scale / SizeClickIntensity)
-
-	-- || Button Interacted Functions
-
-	Button.MouseEnter:Connect(function()
-
-		SFXFolder.Hover:Play()
-		TweenService:Create(Button, ButtonHoverInfo, {Size = TargetHoverSize}):Play()
-
-		if Button.Parent.Parent == SidesButtons then
-
-			SideButtonsNameLabel.Text = Button.Parent.Name
-			SideButtonsNameLabel.Visible = true
-			SideButtonsNameLabel.Position = orgSideButtonsNameLabelPos
-
-			local SBNLTargetPos = UDim2.new(Button.Position.X.Scale + .08, 0, Button.Position.Y.Scale + .03)
-			TweenService:Create(SideButtonsNameLabel, SBNLInfo, {Position = SBNLTargetPos}):Play()
-
-		end
-
-	end)
-	Button.MouseLeave:Connect(function()
-		SideButtonsNameLabel.Visible = false
-		TweenService:Create(Button, ButtonHoverInfo, {Size = orgButtonSize}):Play()
-	end)
-	Button.Activated:Connect(function()
-
-		Button.Size = TargetClickSize
-		TweenService:Create(Button, ButtonHoverInfo, {Size = TargetHoverSize}):Play()
-		SFXFolder.Click:Play()
-
-		ButtonClicked(Button)
-
-	end)
-
-end
-function MoveNPC(Point, Character)
-	local HRP = Character.HumanoidRootPart
-	repeat
-		task.wait(.0001)
-		local sucess, res = pcall(function()
-			return Character.Humanoid
-		end)
-		if sucess and res then
-			Character.Humanoid:MoveTo(Point)		
-		end
-	until (HRP.Position - Vector3.new(Point.X, HRP.Position.Y, Point.Z) ).magnitude <= 1
-end
-
---// Zombie Properties
-
-local ZomID = 0
-local ZombieSpeedMul = 1
-
-local function CreateZombie(Zombie: Model | Instance, Wave: string, Amount: number, WaitTime: number, ZombieStats)
-
-	for i=1, Amount do
-
-		if not Zombie then error(Zombie) return end
-		local newZombie: Model = Zombie:Clone()
-
-		ZomID += 1
-		newZombie.Name = newZombie.Name .. ZomID
-
-		newZombie.Parent = workspace.CreatedZombies
-		newZombie:PivotTo(CFrame.new(StartBlock.Position.X, StartBlock.Position.Y + 3, StartBlock.Position.Z))
-
-		local RootPart: Part = newZombie:FindFirstChild("HumanoidRootPart")
-		newZombie.PrimaryPart = RootPart
-
-		local Humanoid: Humanoid = newZombie:FindFirstChild("Humanoid")
-		Humanoid.WalkSpeed = ZombieStats.Speed * ZombieSpeedMul
-		Humanoid.MaxHealth = ZombieStats.Health
-		Humanoid.Health = Humanoid.MaxHealth
-
-		-- || On Death
-
-		Humanoid.Died:Connect(function()
-			newZombie:Destroy()
-		end)
-
-		-- || Moving the Zombie
-
-		task.spawn(function()
-			for i=1, #TargetPositions:GetChildren() do
-
-				local TargetObj: Part = TargetPositions[i]
-				if not TargetObj then warn(TargetObj) continue end
-
-				MoveNPC(TargetObj.Position, newZombie)
-
-			end
-			MoveNPC(workspace.End.Position, newZombie)
-			newZombie:Destroy()
-		end)
-
-		task.wait(WaitTime)
-
-	end
-
-end
+	--// Setting its Variables
+	TargetTower.Name = TargetTower.Name .. TowerID	
+	TargetTower.Parent = workspace.Creations.CreatedTowers
+	RootPart.CFrame = TowerPos
+	
+	local TowerTableRange = TowerTable.TowerStats.Base.Range
+	CreateRangeSensor(TargetTower, TowerTableRange, RootPart, TowerTable)
+	
+	PlaceTowerEvent:FireClient(Player, TargetTower) -- Fires to the client that its tower was succesfully placed
+	ServerPlaceTowerEvent:FireAllClients(TargetTower)
+	
+end)
