@@ -1,180 +1,4 @@
-The Script Below is a Gun System
-
------------------------------------------------------------<<< Variables
----// Services
-
-local TweenService = game:GetService("TweenService")
-local UserInput = game:GetService("UserInputService")
-
----// Player Variables
-
-local Player = game.Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local Backpack = Player.Backpack
-local HumanoidRootPart: Part = Character:WaitForChild("HumanoidRootPart")
-
-while not Backpack do
-	task.wait()
-end
-
-local Camera = workspace.CurrentCamera
-local Mouse = Player:GetMouse()
-local Storage = game.ReplicatedStorage
-
-local GunFolder = Storage:WaitForChild("Gun")
-local ModulesFolder = Storage:WaitForChild("Modules")
-local EffectsFolder = GunFolder:WaitForChild("Effects")
-
----// Properties
-local Upgrade = 1
-
------------------------------------------------------------<<< Early Code
-
-Mouse.Icon = "rbxassetid://18495779444"
-
------------------------------------------------------------<<< Functions
-
-Here, we are raycasting to see what Position the bullet is going to land on.
-
-local GunParams = RaycastParams.new()
-GunParams.FilterType = Enum.RaycastFilterType.Exclude
-GunParams.FilterDescendantsInstances = {Character}
-
-local function MouseRaycast(Params, Origin, Position2: Vector3)
-	
-	local MousePos = UserInput:GetMouseLocation() -- Gets Mouse Position
-	local MouseRay = Camera:ViewportPointToRay(MousePos.X, MousePos.Y)
-	local result = workspace:Raycast(MouseRay.Origin, MouseRay.Direction * 100, Params)  -- Casts a Ray to the Mouse Position
-
-	if result then
-		return result
-	end
-
-end
-
------------------------------------------------------------<<< Gun Functionality
-
-local Gun = Backpack:WaitForChild("Gun")
-local BulletsFolder = GunFolder:WaitForChild("Bullets")
-local GunUpgrades = require(ModulesFolder:WaitForChild("GunUpgrades")) 
-
-Gun.Parent = Character
-
--- This Function Runs Through a List of particles, Emits them to Create a Gun Firing Effect.
-
-local function CreateBulletEffects(Bullet: Part | UnionOperation)
-	local BulletPos = Bullet.Position
-	local newBlast = EffectsFolder.Blast:Clone()
-	
-	for _, v: ParticleEmitter in newBlast:GetChildren() do
-		v.Parent = Bullet
-		v:Emit()
-	end
-	task.wait(.5)
-	newBlast:Destroy()
-end
-
-local function FireBullet()
-
-	local TargetPos	
-	TargetPos = Mouse.Hit -- Gets Mouse CFrame
-
-	-- || Moving Bullet to Target
-
-	local TargetGunTable: GunUpgrades.Upgrade = GunUpgrades["Upgrade" .. Upgrade]
-	local BulletToDestinationTime = (TargetPos.Position - HumanoidRootPart.Position).Magnitude/TargetGunTable.Bullet.Properties.Speed -- Calculates Speed with a Module which is Divided with the Magnitude of the TargetPostion, and the OriginPostiion (HumanoidRootPart.Position)
-
-	local NewBullet = TargetGunTable.Bullet.Obj:Clone()
-	NewBullet.Parent = workspace
-	NewBullet.Position = Gun.Handle.Position
-
-	local ShootTI = TweenInfo.new(BulletToDestinationTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-	NewBullet.Orientation = Mouse.Hit.LookVector
-	local MoveBulletTween
-
-	-- The Tween for the Bullet Moving to the Targeted Position
-	MoveBulletTween = TweenService:Create(NewBullet, ShootTI, {CFrame = TargetPos}) -- || No Collision In Way
-
-	MoveBulletTween:Play()
-	
-	-- || Effects
-	
-	local ExplodeAtGun = EffectsFolder.ExplodeAtGun:Clone()
-	ExplodeAtGun.Parent = Gun.Tip
-	ExplodeAtGun:Emit(16)
-	
-	task.spawn(function()
-		MoveBulletTween.Completed:Wait()
-		CreateBulletEffects(NewBullet)
-	end)
-	
-	task.wait(5)
-	NewBullet:Destroy()
-
-end
-
-Gun.Activated:Connect(function()
-	FireBullet()
-end)
-
-Script 2:
-
-
----// This Other Script is For Visuals (Stil in the Gun Game), such as Arm Drag, Arms, Gun Drag, Etc.
------------------------------------------------------------<<< Variables
-
----// Player Variables
-
-local Player = game.Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local Backpack = Player.Backpack
-local HumanoidRootPart: Part = Character:WaitForChild("HumanoidRootPart")
-
-while not Backpack do
-	task.wait()
-end
-
-local Camera = workspace.CurrentCamera
-local Mouse = Player:GetMouse()
-local Storage = game.ReplicatedStorage
-
-local GunFolder = Storage:WaitForChild("Gun")
-local ModulesFolder = Storage:WaitForChild("Modules")
-local EffectsFolder = GunFolder:WaitForChild("Effects")
-
-Camera.FieldOfView = 75
-game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
-
-local Cloneable = Storage:WaitForChild("Cloneable")
-local StorageArmsFolder = Cloneable:WaitForChild("Arms")
-local Gun = Character:WaitForChild("Gun")
-local GunHandle: Part = Gun:WaitForChild("Handle")
-
------------------------------------------------------------<<< Arms
-
-local Arms = StorageArmsFolder:Clone()
-
----// Positioning the Arms
-
-Arms.Parent = workspace
-Arms:MoveTo(HumanoidRootPart.Position + Vector3.new(0, -.1, 0))
-
---// Welding the Arms to the Character
-
-for _, v in Arms:GetChildren() do
-	if not v:FindFirstChildWhichIsA("WeldConstraint") then
-		continue
-	end
-	v:FindFirstChildWhichIsA("WeldConstraint").Part0 = v
-	v:FindFirstChildWhichIsA("WeldConstraint").Part1 = HumanoidRootPart
-end
-
------------------------------------------------------------>>>
-
-
-I ran out of code of the gun system, as this was something I made just today.
-The Next script is part of a TDS game that I made.
-
+Below is the script for a TDS game.
 
 -----------------------------------------------------------------------<<< VARIABLES
 --// Services
@@ -216,10 +40,12 @@ local AmountSkipped = 0
 -----------------------------------------------------------------------<<< LEADERSTATS
 
 game.Players.PlayerAdded:Connect(function(Player)
-	
+
+	-- Creates a Folder, this will contain the values for the leaderstats
 	local leaderstats = Instance.new("Folder", Player)
 	leaderstats.Name = "leaderstats"
-	
+
+	-- Our first value, an IntValue for Cash.
 	local Cash = Instance.new("IntValue", leaderstats)
 	Cash.Name = "Cash"
 	Cash.Value = 100000
@@ -234,9 +60,9 @@ local ChangeTimerEvent = EventsFolder.ChangeTimer
 local SkipButtonIsVisible
 
 local function ChangePlayerTimer(Type: string)
-	if Type == "PreWave_Countdown" then -- Checks if the RemoteEvent is Requesting a Countdown Before Wave
+	if Type == "PreWave_Countdown" then -- Checks if the Player is Requesting a prewave cooldown
 		for i=5, 0, -1 do
-			ChangeTimerEvent:FireAllClients(i, true) -- Fires a RemoteEvent to all Clients
+			ChangeTimerEvent:FireAllClients(i, true) -- Every Second, it Fires a RemoteEvent to all players changing the Timer on their Screen.
 			task.wait(1)
 		end
 	end
@@ -244,27 +70,39 @@ end
 
 local PlayerJoinEvent = EventsFolder.PlayerJoinEvent
 
-game.Players.PlayerAdded:Connect(function(Player)
+game.Players.PlayerAdded:Connect(function(Player) -- Firing a RemoteEvent, carrying Information to load Up Player Data
 	PlayerJoinEvent:FireClient(Player, SkipButtonIsVisible, "Wave " .. CurrentWave, workspace.Creations.CreatedTowers:GetChildren())	
 end)
 
 ---// Useful Functions
 
---- This Function Checks If a Zombie is in the Range of a Tower
-local function GetPartsTouching(Part: Part, Exlusions: "Parent" | BoolValue, Type: string)
-	
-	local filter = OverlapParams.new() -- Creates a Filter
+local function GetPartsTouching(Part: Part, Exlusions: "Parent" | BoolValue, Type: string) -- Checks if a Zombie is in a Tower's Sensor using GetPartsInPart
+
+	-- New Params
+	local filter = OverlapParams.new()
 	
 	if Type == "ZomTouching" then
 		filter.FilterType = Enum.RaycastFilterType.Include
-		-- A loop adding all other zombies into the filter.
-
-		for _, v in workspace.CreatedZombies:GetChildren() do
+		for _, v in workspace.CreatedZombies:GetChildren() do -- Adding Other Zombies to the Filter
 			local zomSens: Part = v:FindFirstChild("Sensor")
 			if not zomSens then continue end
 			filter:AddToFilter(zomSens)
 		end
-
+	elseif Type == "Tower" then
+		filter.FilterType = Enum.RaycastFilterType.Include
+		for _, v in workspace.Creations.CreatedTowers:GetChildren() do
+			local RangeSens: Part
+			
+			if v.Name == "TODO?_#FF133" then
+				RangeSens = v
+			else
+				RangeSens = v:FindFirstChild("RangeSensor")
+			end
+			
+			if not RangeSens then continue end
+			filter:AddToFilter(RangeSens)
+			
+		end	
 	else
 		filter.FilterType = Enum.RaycastFilterType.Exclude
 		if Exlusions then
@@ -273,37 +111,211 @@ local function GetPartsTouching(Part: Part, Exlusions: "Parent" | BoolValue, Typ
 	end
 	
 	local cframe, size = Part.CFrame, Part.Size
-	return workspace:GetPartBoundsInBox(cframe, size, filter) -- returns the result of what is inside the zombies.
+	return workspace:GetPartBoundsInBox(cframe, size, filter) -- Here is when we return the result with GetPartsBoundInBox
 	
 end
 
+-----------------------------------------------------------------------<<< TOWER CREATION
 
-----// This Next Script is for when a Client Places a Tower
-
+local PlaceTowerEvent = EventsFolder.PlaceTower
+local ServerPlaceTowerEvent = EventsFolder.ServerPlaceEvent
+local TowerProperties = require(CoreStorage.Modules.TowerProperties)
+local RangeSensor = CloneableFolder.RangeSensor
+local SpefTowerStats = TowerProperties.SpefTowerStats
+local FighterAnimations = Fighter.Animations
+local ZombiesInRange = {}
 local TowerID = 0
 
-PlaceTowerEvent.OnServerEvent:Connect(function(Player, Tower: Model, TowerTable, TowerPos: CFrame)
-	
-	Player.leaderstats.Cash.Value -= TowerTable.Costs.BaseCost -- Checks if the Player has Enough Money
-	Tower:SetAttribute("Level", 0) -- Sets the Level of the Tower (Base Level 0 as it is a new tower)
-	Tower:SetAttribute("Player", Player.Name) -- Sets the value of who places the tower
-	Tower:SetAttribute("Attacking", false)
-	TowerID += 1 -- Increases ID to make this tower different from the rest.
+local function TowerAttackSFX(Level: number) -- Tower Attacking Sounds
+	if Level >= 4 then
+		SoundsFolder.SFX.MetalBat:Play()
+	else
+		SoundsFolder.SFX.hit_punch_l:Play()
+	end
+end
 
-	--// Cloning the Tower in Replicated Storage
+local function TowerAttack(Zombie: Model, Tower: Model, TowerTable)
+
+	Tower:SetAttribute("Attacking", true)	-- Sets Attribute to Attacking
+	local TowerLevel = Tower:GetAttribute("Level")  
+	local TowerStats: SpefTowerStats = TowerTable.TowerStats["Upgrade" .. TowerLevel] -- A Module that Contains the Towers Stats, This will Be Useful for Calculating its Damage, firerate, etc.
+	local TowerAnimTable = TowerTable.Animations
+	
+	if not TowerStats then
+		TowerStats = TowerTable.TowerStats.Base -- If Tower Level=0, the module is set to the default values.
+	end
+	
+	local ZombieHumanoid: Humanoid = Zombie:WaitForChild("Humanoid")
+	local TowerRootPart: Part = Tower:WaitForChild("HumanoidRootPart")
+	local ZombieRootPart: Part = Zombie:WaitForChild("HumanoidRootPart")
+	ZombieHumanoid.Health -= TowerStats.Damage
+	
+	local TowerHumanoid: Humanoid = Tower:WaitForChild("Humanoid")
+	local TowerAnimator: Animator = TowerHumanoid:WaitForChild("Animator")
+	
+	TowerRootPart.CFrame = CFrame.new(TowerRootPart.Position, ZombieRootPart.Position) -- Here we are positioning the PrimaryPart of the Tower to the Towers Position, But facing the Zombie.
+
+	local TowerAttackAnim: Animation = TowerAnimTable[TowerLevel + 1] -- Getting the Tower's Attack Animation from the Towers Module
+	if not TowerAttackAnim then warn(TowerAttackAnim) return end
+	local TowerTrueAnimation = TowerAnimator:LoadAnimation(TowerAttackAnim)
+	
+	if string.match(Tower.Name, "Fighter") then -- Playing the Tower's Animation
+		TowerTrueAnimation:Play()
+		TowerAttackSFX(TowerLevel)
+		TowerTrueAnimation.Ended:Wait()
+	end
+	
+	task.wait(TowerStats.FireRate)
+	Tower:SetAttribute("Attacking", false) -- Finished, Removing Debound
+	
+end
+
+local function CreateRangeSensor(TargetTower: Model, TowerTableRange: number, RootPart: Part, TowerStats) -- Creating a Tower's Sensor
+
+	local newRangeSensor
+	local ClonedSensor = RangeSensor:Clone()
+	ClonedSensor.Parent = TargetTower
+		
+	ClonedSensor.Position = RootPart.Position -- Positioning the Range to the Tower's Rootpart
+	ClonedSensor.Size = Vector3.new(
+		TowerTableRange, ClonedSensor.Size.Y, TowerTableRange -- Changing the Size to the Modules Tower Level Size
+	)
+	
+	--[[
+		local otherRSensorTouching = GetPartsTouching(ClonedSensor, TargetTower, "Tower") -- Here we check if there are any other tower sensors in the Towers Sensor using GetPartBoundsInBox
+	
+	if #otherRSensorTouching > 1 then -- If there are Any Touching
+		local sucess, newUnion: Part = pcall(function() -- If there are, it Unions >2 Towers Sensors to save Performance, returns result through a protected call.
+			return ClonedSensor:UnionAsync(otherRSensorTouching)
+		end)
+		if sucess and newUnion then -- Sucess, now we are unioning them
+			for _, v in otherRSensorTouching do
+				if not v then continue end
+				v:Destroy()
+			end
+			newUnion.Parent = workspace.Creations.CreatedTowers
+			newUnion.Name = "UnionRangeSensor"
+			newRangeSensor = newUnion
+		else
+			warn(newUnion) -- Unsuccessful
+		end
+	else
+		newRangeSensor = ClonedSensor
+	end
+	]]	
+	
+	newRangeSensor = ClonedSensor
+	
+	newRangeSensor.Touched:Connect(function(part)
+		
+		if TargetTower:GetAttribute("Attacking") then -- Debound
+			return
+		end
+
+		-- Checks
+		if not part.Parent then return end
+		if game.Players:FindFirstChild(part.Parent.Name) then return end
+		local ZombieTouched: Model = workspace.CreatedZombies:FindFirstChild(part.Parent.Name)
+		if not ZombieTouched then return end
+		if part.Name == "Sensor" then return end
+		
+		print('Ran')
+		
+		local ZombiesInRange = GetPartsTouching(ZombieTouched:WaitForChild("Sensor"), TargetTower, "ZomTouching") -- Checks if any Zombies are in the Tower's Sensor, using our function from before.
+		if #ZombiesInRange <= 0 then return end -- If there are no Zombies in the Tower Sensor, than it returns
+		local FurthestSensor
+		local FurthustZom
+		
+		for i, v: Part in ZombiesInRange do -- Looping through the result of GetPartBoundsInBox.
+			
+			local Zom = v.Parent
+			local targetZomID = string.match(Zom.Name, "%d+") -- Gets the ID of the Zombie
+			
+			if not FurthestSensor then
+				FurthestSensor = targetZomID
+				FurthustZom = v.Parent
+			end
+			if targetZomID < FurthestSensor then
+				FurthestSensor = targetZomID
+				FurthustZom = v.Parent
+			end
+			
+		end
+		
+		if not FurthustZom then warn(FurthustZom) return end
+		TowerAttack(FurthustZom, TargetTower, TowerStats)
+		
+	end)
+	
+end
+
+PlaceTowerEvent.OnServerEvent:Connect(function(Player, Tower: Model, TowerTable, TowerPos: CFrame) -- When a Tower is Placed
+
+	-- Setting up all the New Towers Attributes
+	Player.leaderstats.Cash.Value -= TowerTable.Costs.BaseCost
+	Tower:SetAttribute("Level", 0)
+	Tower:SetAttribute("Player", Player.Name)
+	Tower:SetAttribute("Attacking", false)
+	TowerID += 1 -- ID of Zombie
+	
 	local TowerHumanoid: Humanoid = Tower:WaitForChild("Humanoid")	
 	local TargetTower = Tower:Clone()
 	local RootPart: Part = TargetTower:WaitForChild("HumanoidRootPart")
 
-	--// Setting its Variables
 	TargetTower.Name = TargetTower.Name .. TowerID	
 	TargetTower.Parent = workspace.Creations.CreatedTowers
 	RootPart.CFrame = TowerPos
 	
 	local TowerTableRange = TowerTable.TowerStats.Base.Range
-	CreateRangeSensor(TargetTower, TowerTableRange, RootPart, TowerTable)
+	CreateRangeSensor(TargetTower, TowerTableRange, RootPart, TowerTable) -- Creates a RangeSensor for the Tower
 	
-	PlaceTowerEvent:FireClient(Player, TargetTower) -- Fires to the client that its tower was succesfully placed
+	PlaceTowerEvent:FireClient(Player, TargetTower) -- Fires a RemoteEvent to the Client Who Placed, this way the client can select the Tower, Upgrade it, Etc.
 	ServerPlaceTowerEvent:FireAllClients(TargetTower)
+	
+end)
+
+-----------------------------------------------------------------------<<< TOWER UPGRADE
+
+local UpgradeTowerEvent = EventsFolder.UpgradeTower
+
+UpgradeTowerEvent.OnServerEvent:Connect(function(Player, Cost: number, Tower: Model, TowerTable) -- When a Tower is Upgraded
+
+	local Cash: IntValue = Player.leaderstats.Cash
+	Cash.Value -= Cost -- Taking the Cash away from player
+	local TowerLevel = Tower:GetAttribute("Level")
+	local UpgradeNum: string = "Upgrade" .. Tower:GetAttribute("Level") + 1 -- Adding a level onto the Tower, by getting its current attribute and adding on by 1
+	
+	local SelectTower = TowerTable.UpgradesModels[UpgradeNum]
+	if not SelectTower then warn(SelectTower) return end
+	local NextTower: Model = SelectTower:Clone()
+
+	-- Moving the Tower using PivotTo.
+	NextTower:PivotTo(Tower:GetPivot())
+	NextTower.Name = Tower.Name
+	NextTower.Parent = Tower.Parent
+	local RootPart: Part = NextTower:WaitForChild("HumanoidRootPart")
+	
+	local TowerTableRange = TowerTable.TowerStats[UpgradeNum].Range
+	CreateRangeSensor(NextTower, TowerTableRange, RootPart, TowerTable)
+	
+	NextTower:SetAttribute("Level", TowerLevel + 1)
+	NextTower:SetAttribute("Player", Player.Name)
+	Tower:Destroy()
+	PlaceTowerEvent:FireClient(Player, NextTower, true)
+	ServerPlaceTowerEvent:FireAllClients(NextTower)
+	
+end)
+
+---// Tower Selling
+
+local SellTowerEvent = EventsFolder.SellTowerEvent
+
+SellTowerEvent.OnServerEvent:Connect(function(Player, CashAmount: number, Tower: Model) -- On Event, information is fired over including the CashAmount, and the Tower being sold
+	
+	if not CashAmount then return end
+	local Cash: IntValue = Player.leaderstats.Cash -- Setting the Variable for the Players Leaderstat
+	
+	Cash.Value += CashAmount -- Adding onto the leaderstat
+	Tower:Destroy() -- Finally destroying the tower
 	
 end)
